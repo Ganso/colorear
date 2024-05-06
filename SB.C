@@ -1,0 +1,68 @@
+#include <dos.h>
+
+void DSPout(unsigned,unsigned char);
+char DSPini(unsigned);
+void play(unsigned,unsigned char *,unsigned,unsigned);
+void spkon(unsigned);
+
+void spkon(unsigned base)
+{
+DSPout(base,0xD1);
+}
+
+void DSPout(unsigned base,unsigned char valor)
+{
+asm {
+	mov dx,base
+	add dx,0Ch
+	}
+espera:
+asm {
+	in al,dx
+	and al,80h
+	jnz espera
+	mov al,valor
+	out dx,al
+	}
+}
+
+char DSPini(unsigned base)
+{
+outportb(base+6,1);
+delay(10);
+outportb(base+6,0);
+delay(10);
+if ((inportb(base+0xE)&0x80)==0x80 && (inportb(base+0xA))==0xAA) return(1);
+else return(0);
+}
+
+void play(unsigned base,unsigned char *sonido,unsigned tam,unsigned freq)
+{
+unsigned pag,des,tam2=tam;
+
+tam2--;
+des=(FP_SEG(sonido)<<4)+FP_OFF(sonido);
+pag=(FP_SEG(sonido)+(FP_OFF(sonido)>>4))>>12;
+
+while (tam2>0) {
+	tam=(des>(0xFFFF-tam2))?0xFFFF-des:tam2;
+	outportb(0xA,5);
+	outportb(0xC,0);
+	outportb(0xB,0x49);
+	outportb(0x2,des&0x00FF);
+	outportb(0x2,(des&0xFF00)>>8);
+	outportb(0x83,pag);
+	outportb(0x3,tam&0x00FF);
+	outportb(0x3,(tam&0xFF00)>>8);
+	outportb(0xA,1);
+	DSPout(base,0x40);
+	DSPout(base,256-1000000/freq);
+	DSPout(base,0x14);
+	DSPout(base,tam&0x00FF);
+	DSPout(base,(tam&0xFF00)>>8);
+	tam2-=tam;
+	des=0;
+	pag++;
+	if (tam2) while (!(inportb(0x0008)&2)) ;
+	}
+}
